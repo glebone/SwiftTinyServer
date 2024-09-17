@@ -1,83 +1,110 @@
+import NIO
+import NIOHTTP1
 import Foundation
-import Network
+import NIOFoundationCompat
 
-class TinyWebFramework: ObservableObject {
-    private var routes: [String: (NWConnection, String) -> Void] = [:]
-    private var listener: NWListener?
-    
-    func addRoute(_ path: String, handler: @escaping (NWConnection, String) -> Void) {
-        routes[path] = handler
-    }
-    
-    func startServer() {
-        let queue = DispatchQueue(label: "ServerQueue")
-        do {
-            listener = try NWListener(using: .tcp, on: 8080)
-            print("Server started and listening on port 8080")
-        } catch {
-            print("Failed to create listener: \(error)")
-            return
-        }
-        
-        listener?.newConnectionHandler = { newConnection in
-            newConnection.start(queue: queue)
-            newConnection.receive(minimumIncompleteLength: 1, maximumLength: 1024) { (data, context, isComplete, error) in
-                if let data = data, let request = String(data: data, encoding: .utf8) {
-                    let path = self.parsePath(from: request)
-                    print("Received request for path: \(path)")
-                    self.handleRequest(newConnection, path: path, request: request)
+struct HTTPRequest {
+    let head: HTTPRequestHead
+    let body: Data
+}
+
+class TinyWebFramework {
+    let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+    var channel: Channel?
+    var routes: [String: (ChannelHandlerContext, HTTPRequest) -> Void] = [:]
+
+    func startServer(host: String = "127.0.0.1", port: Int = 8080) {
+        let bootstrap = ServerBootstrap(group: group)
+            .serverChannelOption(ChannelOptions.backlog, value: 256)
+            .serverChannelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+            .childChannelInitializer { channel in
+                channel.pipeline.configureHTTPServerPipeline().flatMap {
+                    channel.pipeline.addHandler(HTTPHandler(routes: self.routes))
                 }
             }
-        }
-        
-        listener?.start(queue: queue)
-    }
-    
-    func stopServer() {
-        listener?.cancel()
-        print("Server stopped")
-    }
-    
-    private func handleRequest(_ connection: NWConnection, path: String, request: String) {
-        if let handler = routes[path] {
-            handler(connection, request)
-        } else {
-            let response = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n"
-            print("No route found for path: \(path)")
-            connection.send(content: response.data(using: .utf8), completion: .contentProcessed({ _ in
-                connection.cancel()
-                print("Connection closed after 404 response")
-            }))
-        }
-    }
-    
-    func parsePath(from request: String) -> String {
-        let requestLines = request.split(separator: "\n")
-        let requestLine = requestLines.first ?? ""
-        let components = requestLine.split(separator: " ")
-        return components.count > 1 ? String(components[1]) : "/"
-    }
-    
-    func parseMethod(from request: String) -> String {
-        let requestLines = request.split(separator: "\n")
-        let requestLine = requestLines.first ?? ""
-        let components = requestLine.split(separator: " ")
-        return components.count > 0 ? String(components[0]) : "GET"
-    }
-    
-    func parseBody(from request: String) -> [String: String]? {
-        guard let bodyStartIndex = request.range(of: "\r\n\r\n")?.upperBound else {
-            print("Failed to find body in request")
-            return nil
-        }
-        let body = String(request[bodyStartIndex...])
+            .childChannelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
+            .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 1)
+            .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
+
         do {
-            let json = try JSONSerialization.jsonObject(with: Data(body.utf8), options: []) as? [String: String]
-            print("Successfully parsed body: \(String(describing: json))")
-            return json
+            channel = try bootstrap.bind(host: host, port: port).wait()
+            print("Server started and listening on \(channel!.localAddress!)")
         } catch {
-            print("Failed to parse JSON body: \(error)")
-            return nil
+            print("Failed to start server: \(error)")
         }
+    }
+
+    func stopServer() {
+        try? channel?.close().wait()
+        try? group.syncShutdownGracefully()
+        print("Server stopped.")
+    }
+
+    func addRoute(_ path: String, handler: @escaping (ChannelHandlerContext, HTTPRequest) -> Void) {
+        routes[path] = handler
+    }
+}
+
+final class HTTPHandler: ChannelInboundHandler {
+    typealias InboundIn = HTTPServerRequestPart
+
+    private let routes: [String: (ChannelHandlerContext, HTTPRequest) -> Void]
+    private var requestHead: HTTPRequestHead?
+    private var bodyBuffer: ByteBuffer?
+
+    init(routes: [String: (ChannelHandlerContext, HTTPRequest) -> Void]) {
+        self.routes = routes
+    }
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let reqPart = unwrapInboundIn(data)
+
+        switch reqPart {
+        case .head(let head):
+            requestHead = head
+            bodyBuffer = context.channel.allocator.buffer(capacity: 0)
+        case .body(var body):
+            bodyBuffer?.writeBuffer(&body)
+        case .end:
+            guard let requestHead = requestHead else {
+                context.close(promise: nil)
+                return
+            }
+            let readableBytes = bodyBuffer?.readableBytes ?? 0
+            let bodyData: Data
+            if let bodyBuffer = bodyBuffer, readableBytes > 0 {
+                bodyData = bodyBuffer.getData(at: bodyBuffer.readerIndex, length: readableBytes) ?? Data()
+            } else {
+                bodyData = Data()
+            }
+            let request = HTTPRequest(head: requestHead, body: bodyData)
+
+            if let handler = routes[requestHead.uri] {
+                handler(context, request)
+            } else {
+                sendNotFound(context: context, version: requestHead.version)
+            }
+            self.requestHead = nil
+            self.bodyBuffer = nil
+        }
+    }
+
+    func sendNotFound(context: ChannelHandlerContext, version: HTTPVersion) {
+        let headers = HTTPHeaders([("content-type", "text/html; charset=utf-8")])
+        let responseHead = HTTPResponseHead(version: version, status: .notFound, headers: headers)
+        context.write(NIOAny(HTTPServerResponsePart.head(responseHead)), promise: nil)
+
+        var buffer = context.channel.allocator.buffer(capacity: 0)
+        buffer.writeString("<h1>404 Not Found</h1>")
+        context.write(NIOAny(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
+
+        context.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil))).whenComplete { _ in
+            context.close(promise: nil)
+        }
+    }
+
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
+        print("Error: \(error)")
+        context.close(promise: nil)
     }
 }

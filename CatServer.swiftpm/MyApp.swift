@@ -1,17 +1,14 @@
-import SwiftUI
+#if os(Linux)
 import Foundation
 
-#if os(macOS) || os(iOS)
-import SwiftUI
+func linuxMain() {
+    linuxLaunch()
+}
 
-@main
-struct MyApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
+//@main
+struct LinuxApp {
+    static func main() {
+        linuxMain()
     }
 }
-#elseif os(Linux)
-//linuxLaunch()
 #endif
