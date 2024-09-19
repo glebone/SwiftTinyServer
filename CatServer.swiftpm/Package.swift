@@ -16,6 +16,7 @@ let package = Package(
         .iOSApplication(
             name: "My App",
             targets: ["AppModule"],
+            teamIdentifier: "PX8DYSY5X5",
             displayVersion: "1.0",
             bundleVersion: "1",
             appIcon: .placeholder(icon: .bird),
@@ -31,7 +32,9 @@ let package = Package(
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
             ],
             capabilities: [
-                .localNetwork(purposeString: "Local http server", bonjourServiceTypes: [])
+                .localNetwork(purposeString: "Local http server", bonjourServiceTypes: []),
+                .incomingNetworkConnections(),
+                .outgoingNetworkConnections()
             ]
         )
     ],
