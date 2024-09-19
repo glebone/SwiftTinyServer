@@ -53,7 +53,7 @@ func setupRoutes(for webFramework: TinyWebFrameworkProtocol) {
     }
 }
 
-func startWebApp(with webFramework: TinyWebFrameworkProtocol) {
+public func startWebApp(with webFramework: TinyWebFrameworkProtocol) {
     setupRoutes(for: webFramework)
     webFramework.startServer(host: "127.0.0.1", port: 8080)
 }

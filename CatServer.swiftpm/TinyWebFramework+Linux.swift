@@ -4,12 +4,12 @@ import Foundation
 import NIO
 import NIOHTTP1
 
-class TinyWebFramework: TinyWebFrameworkProtocol {
+public class TinyWebServer: TinyWebFrameworkProtocol {
     private let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     private var channel: Channel?
     private var routes: [String: (HTTPRequest, @escaping (HTTPResponse) -> Void) -> Void] = [:]
     
-    func startServer(host: String = "127.0.0.1", port: Int = 8080) {
+    public func startServer(host: String = "127.0.0.1", port: Int = 8080) {
         let bootstrap = ServerBootstrap(group: group)
             .serverChannelOption(ChannelOptions.backlog, value: 256)
             .childChannelInitializer { channel in
@@ -29,13 +29,13 @@ class TinyWebFramework: TinyWebFrameworkProtocol {
         }
     }
     
-    func stopServer() {
+    public func stopServer() {
         try? channel?.close().wait()
         try? group.syncShutdownGracefully()
         print("Server stopped.")
     }
     
-    func addRoute(_ path: String, handler: @escaping (HTTPRequest, @escaping (HTTPResponse) -> Void) -> Void) {
+    public func addRoute(_ path: String, handler: @escaping (HTTPRequest, @escaping (HTTPResponse) -> Void) -> Void) {
         routes[path] = handler
     }
     
@@ -66,15 +66,24 @@ class TinyWebFramework: TinyWebFrameworkProtocol {
                 }
                 let readableBytes = bodyBuffer?.readableBytes ?? 0
                 let bodyData: Data
+
+
+// TinyWebFramework+Linux.swift
+
                 if let bodyBuffer = bodyBuffer, readableBytes > 0 {
-                    bodyData = bodyBuffer.getData(at: bodyBuffer.readerIndex, length: readableBytes) ?? Data()
+                    bodyData = bodyBuffer.getBytes(at: bodyBuffer.readerIndex, length: readableBytes)
+                        .map { Data($0) } ?? Data()
                 } else {
                     bodyData = Data()
                 }
+
+                // Ensure headersDict declaration is on a new line
                 var headersDict = [String: String]()
                 for header in requestHead.headers {
                     headersDict[header.name] = header.value
                 }
+
+
                 let request = HTTPRequest(
                     method: requestHead.method.rawValue,
                     path: requestHead.uri,

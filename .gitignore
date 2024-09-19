@@ -1,0 +1,9 @@
+# Swift Package Manager
+/.CatServer.swiftpm/.build
+/.swiftpm/
+
+# Other common ignores
+*.xcodeproj
+*.xcworkspace
+*.swp
+.DS_Store
