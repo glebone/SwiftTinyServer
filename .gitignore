@@ -1,6 +1,6 @@
 # Swift Package Manager
-/.CatServer.swiftpm/.build
-/.swiftpm/
+./.CatServer.swiftpm/.build
+./.swiftpm/
 
 # Other common ignores
 *.xcodeproj

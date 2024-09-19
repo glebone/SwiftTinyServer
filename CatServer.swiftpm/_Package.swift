@@ -1,39 +1,41 @@
 // swift-tools-version:5.5
-#if os(Linux)
 import PackageDescription
 
 let package = Package(
     name: "TinyWebFramework",
-    platforms: [
-        .linux
-    ],
     products: [
-        .executable(name: "LinuxApp", targets: ["LinuxApp"])
+        .executable(name: "TinyWebApp", targets: ["TinyWebApp"])
     ],
     dependencies: [
-        // Add the NIO dependencies for the Linux project
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0")
+        // NIO dependencies for Linux
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.32.0")
     ],
     targets: [
-        // Shared framework logic for the TinyWebFramework
-        .target(
-            name: "TinyWebFramework",
+        // Combined target for the executable
+        .executableTarget(
+            name: "TinyWebApp",
             dependencies: [
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio")
             ],
-            path: "Sources/TinyWebFramework"
-        ),
-        // Linux-specific executable
-        .executableTarget(
-            name: "LinuxApp",
-            dependencies: ["TinyWebFramework"],
-            path: "Sources/LinuxApp"
-        ),
-        .testTarget(
-            name: "TinyWebFrameworkTests",
-            dependencies: ["TinyWebFramework"]
+            path: ".",
+            exclude: [
+                "ContentView.swift",
+                "LinuxLaunch.swift",
+                "MyApp.swift",
+                "TinyWebFramework+iPad.swift"
+            ],
+            sources: [
+                "TinyWebFramework.swift",
+                "TinyWebFramework+Linux.swift",
+                "Model.swift",
+                "NoteModel.swift",
+                "Webapp.swift",
+                "main.swift"
+            ],
+            resources: [
+                .copy("Resources/notes.json")
+            ]
         )
     ]
 )
-#endif
