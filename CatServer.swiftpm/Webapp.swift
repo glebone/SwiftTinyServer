@@ -15,11 +15,19 @@ func setupRoutes(for webFramework: TinyWebFrameworkProtocol) {
         print("Handled / route with Hello, World!")
     }
     
+    
     webFramework.addRoute("/note") { request, respond in
         let method = request.method
         print("Handling /note route with method: \(method)")
-        
         if method == "POST" {
+            
+            if let bodyString = String(data: request.body, encoding: .utf8) {
+                print("Request body as string: \(bodyString)")
+            } else {
+                print("Failed to decode request body as string.")
+            }
+            
+            
             if let noteDict = try? JSONSerialization.jsonObject(with: request.body, options: []) as? [String: String] {
                 noteModel.addNote(noteDict)
                 let response = HTTPResponse(statusCode: 201, headers: [:], body: Data())
@@ -30,6 +38,26 @@ func setupRoutes(for webFramework: TinyWebFrameworkProtocol) {
                 respond(response)
                 print("Failed to parse body for POST /note")
             }
+        }
+        else
+        {
+            let response = HTTPResponse(statusCode: 405, headers: [:], body: Data())
+            respond(response)
+            print("Method not allowed for /note right now")
+        }
+    }
+                            
+    
+    
+    webFramework.addRoute("/notes") { request, respond in
+        let method = request.method
+        print("Handling /notes route with method: \(method)")
+        
+        if method == "POST" {
+            let response = HTTPResponse(statusCode: 405, headers: [:], body: Data())
+            respond(response)
+            print("Method not allowed for /notes right now")
+                        
         } else if method == "GET" {
             let notes = noteModel.getNotes()
             if let data = try? JSONSerialization.data(withJSONObject: notes, options: []) {
