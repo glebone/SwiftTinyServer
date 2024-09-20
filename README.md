@@ -26,3 +26,7 @@ TinyWebFramework is a lightweight, multiplatform web framework designed to run o
        "title": "Test Note",
        "content": "Some Text for the test note"
    }'
+   
+   For the get some note 
+   
+curl -X GET http://127.0.0.1:8080/note/D96E3D8F-91F3-4F8E-BD89-1ABFD8D3A123

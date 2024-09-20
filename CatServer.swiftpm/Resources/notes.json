@@ -1,15 +1,18 @@
 [
     {
+        "id": "D96E3D8F-91F3-4F8E-BD89-1ABFD8D3A123",
         "title": "First Note",
         "content": "This is the content of the first note.",
         "date": "2024-09-03T10:00:00Z"
     },
     {
+        "id": "A24F2E4F-49B4-4EFA-B8DD-3BB4A2A1E452",
         "title": "Second Note",
         "content": "This is the content of the second note.",
         "date": "2024-09-03T11:00:00Z"
     },
     {
+        "id": "B71A8A93-86F5-4C25-B9E4-9B0C6D1234C1",
         "title": "Third Note",
         "content": "This is the content of the third note.",
         "date": "2024-09-03T12:00:00Z"

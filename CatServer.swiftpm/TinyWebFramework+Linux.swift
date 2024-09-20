@@ -1,4 +1,3 @@
-// TinyWebFramework+Linux.swift
 #if os(Linux)
 import Foundation
 import NIO
@@ -14,7 +13,7 @@ public class TinyWebServer: TinyWebFrameworkProtocol {
             .serverChannelOption(ChannelOptions.backlog, value: 256)
             .childChannelInitializer { channel in
                 channel.pipeline.configureHTTPServerPipeline().flatMap {
-                    channel.pipeline.addHandler(HTTPHandler(routes: self.routes))
+                    channel.pipeline.addHandler(HTTPHandler(routes: self.routes, server: self))
                 }
             }
             .serverChannelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
@@ -37,17 +36,34 @@ public class TinyWebServer: TinyWebFrameworkProtocol {
     
     public func addRoute(_ path: String, handler: @escaping (HTTPRequest, @escaping (HTTPResponse) -> Void) -> Void) {
         routes[path] = handler
+        print("Added route for path: \(path)") // Debug
+    }
+    
+    // Dynamic route matching logic
+    public func matchDynamicRoute(_ path: String) -> ((HTTPRequest, @escaping (HTTPResponse) -> Void) -> Void)? {
+        for (route, handler) in routes {
+            if route.contains("{") && route.contains("}") {
+                let staticPart = route.split(separator: "{").first ?? ""
+                if path.starts(with: staticPart) {
+                    print("Dynamic route matched: \(route)")  // Debug
+                    return handler
+                }
+            }
+        }
+        return nil
     }
     
     final class HTTPHandler: ChannelInboundHandler {
         typealias InboundIn = HTTPServerRequestPart
         
         private let routes: [String: (HTTPRequest, @escaping (HTTPResponse) -> Void) -> Void]
+        private let server: TinyWebServer
         private var requestHead: HTTPRequestHead?
         private var bodyBuffer: ByteBuffer?
         
-        init(routes: [String: (HTTPRequest, @escaping (HTTPResponse) -> Void) -> Void]) {
+        init(routes: [String: (HTTPRequest, @escaping (HTTPResponse) -> Void) -> Void], server: TinyWebServer) {
             self.routes = routes
+            self.server = server
         }
         
         func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -66,24 +82,19 @@ public class TinyWebServer: TinyWebFrameworkProtocol {
                 }
                 let readableBytes = bodyBuffer?.readableBytes ?? 0
                 let bodyData: Data
-
-
-// TinyWebFramework+Linux.swift
-
+                
                 if let bodyBuffer = bodyBuffer, readableBytes > 0 {
                     bodyData = bodyBuffer.getBytes(at: bodyBuffer.readerIndex, length: readableBytes)
                         .map { Data($0) } ?? Data()
                 } else {
                     bodyData = Data()
                 }
-
-                // Ensure headersDict declaration is on a new line
+                
                 var headersDict = [String: String]()
                 for header in requestHead.headers {
                     headersDict[header.name] = header.value
                 }
-
-
+                
                 let request = HTTPRequest(
                     method: requestHead.method.rawValue,
                     path: requestHead.uri,
@@ -91,13 +102,24 @@ public class TinyWebServer: TinyWebFrameworkProtocol {
                     body: bodyData
                 )
                 
+                // Try exact match first
                 if let handler = routes[requestHead.uri] {
+                    print("Exact match found for path: \(requestHead.uri)")  // Debug
                     handler(request) { response in
                         self.sendResponse(context: context, response: response, version: requestHead.version)
                     }
+                }
+                // Try dynamic route match
+                else if let matchedHandler = server.matchDynamicRoute(requestHead.uri) {
+                    print("Dynamic match found for path: \(requestHead.uri)")  // Debug
+                    matchedHandler(request) { response in
+                        self.sendResponse(context: context, response: response, version: requestHead.version)
+                    }
                 } else {
+                    print("No route found for path: \(requestHead.uri)")  // Debug
                     self.sendNotFound(context: context, version: requestHead.version)
                 }
+                
                 self.requestHead = nil
                 self.bodyBuffer = nil
             }
@@ -118,7 +140,7 @@ public class TinyWebServer: TinyWebFrameworkProtocol {
             
             context.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil))).whenComplete { _ in
                 context.close(promise: nil)
-            }
+             }
         }
         
         func sendNotFound(context: ChannelHandlerContext, version: HTTPVersion) {
