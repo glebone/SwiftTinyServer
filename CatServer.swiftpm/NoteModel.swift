@@ -30,6 +30,15 @@ class NoteModel: Model {
         return newNote
     }
     
+    func deleteNoteByID(_ id: String) -> Bool {
+            if let index = notes.firstIndex(where: { $0.id == id }) {
+                notes.remove(at: index)
+                saveNotesToFile()
+                return true // Note was successfully deleted
+            }
+            return false // Note with the given ID was not found
+        }
+    
     // Get all notes
     func getAllNotes() -> [Note] {
         return notes
@@ -38,6 +47,29 @@ class NoteModel: Model {
     // Get a note by UDID
     func getNoteByID(_ id: String) -> Note? {
         return notes.first { $0.id == id }
+    }
+    
+    func generateNotesHTML(from notes: [Note]) -> String {
+        var htmlContent = ""
+        
+        for note in notes {
+            htmlContent += """
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">\(note.title)</h5>
+                    <p class="card-text">\(note.content)</p>
+                    <p class="card-text"><small class="text-muted">\(note.date)</small></p>
+                    <form action="/note/\(note.id)" method="DELETE">
+                        <input type="hidden" name="_method" value="DELETE">
+                        <input type="hidden" name="udid" value="\(note.id)">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+            """
+        }
+        
+        return htmlContent
     }
     
     // Load notes from JSON file
