@@ -1,10 +1,13 @@
 // main.swift
 /*import Foundation
-import Dispatch
-import TinyWebFramework
+ import Dispatch
+ import TinyWebFramework
 
-let webFramework: TinyWebFrameworkProtocol = TinyWebServer()
-startWebApp(with: webFramework)
+ // Instantiate the web framework (Linux-specific server)
+ let webFramework: TinyWebFrameworkProtocol = TinyWebServer()
 
-// Keep the server running indefinitely
-dispatchMain()*/
+ // Start the web app with defined routes
+ startWebApp(with: webFramework)
+
+ // Keep the server running indefinitely
+ dispatchMain()*/
