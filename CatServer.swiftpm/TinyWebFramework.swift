@@ -7,7 +7,6 @@ public protocol TinyWebFrameworkProtocol {
     func loadHTMLTemplate(named fileName: String) throws -> String
 }
 
-// Ensure HTTPRequest and HTTPResponse are public
 public struct HTTPRequest {
     public let method: String
     public let path: String
@@ -25,12 +24,10 @@ extension TinyWebFrameworkProtocol {
     
     public func loadHTMLTemplate(named fileName: String) throws -> String {
 #if os(macOS) || os(iOS)
-        // Try to locate the file in the app bundle on macOS/iOS
         guard let fileURL = Bundle.main.url(forResource: fileName, withExtension: nil) else {
             throw NSError(domain: "TinyWebFramework", code: 1, userInfo: [NSLocalizedDescriptionKey: "The file \(fileName) couldn't be found."])
         }
 #else
-        // On Linux, look in the local directory or other specified location
         let fileURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Resources").appendingPathComponent(fileName)
 #endif
         
@@ -43,14 +40,11 @@ extension TinyWebFrameworkProtocol {
     }
     
     public func parseFormData(from body: Data) -> [String: String]? {
-        guard let bodyString = String(data: body, encoding: .utf8) else {
-            return nil
-        }
+        guard let bodyString = String(data: body, encoding: .utf8) else { return nil }
         
         let formData = bodyString.split(separator: "&").reduce(into: [String: String]()) { result, keyValuePair in
             let pair = keyValuePair.split(separator: "=")
             if pair.count == 2, let key = pair.first?.removingPercentEncoding, let value = pair.last?.removingPercentEncoding {
-                // Replace '+' with space as part of decoding URL-encoded form data
                 result[key] = value.replacingOccurrences(of: "+", with: " ")
             }
         }
@@ -64,19 +58,10 @@ extension TinyWebFrameworkProtocol {
         
         do {
             let data = try encoder.encode(object)
-            let response = HTTPResponse(
-                statusCode: statusCode,
-                headers: ["Content-Type": "application/json"],
-                body: data
-            )
+            let response = HTTPResponse(statusCode: statusCode, headers: ["Content-Type": "application/json"], body: data)
             responseHandler(response)
         } catch {
-            let response = HTTPResponse(
-                statusCode: 500,
-                headers: ["Content-Type": "text/plain"],
-                body: "Error encoding data.".data(using: .utf8) ?? Data()
-            )
-            responseHandler(response)
+            errorResponse(statusCode: 500, message: "Error encoding data.", responseHandler: responseHandler)
         }
     }
     
@@ -87,5 +72,15 @@ extension TinyWebFrameworkProtocol {
             body: message.data(using: .utf8) ?? Data()
         )
         responseHandler(response)
+    }
+    
+    public func addJsonRoute(_ path: String, handler: @escaping (HTTPRequest, @escaping (HTTPResponse) -> Void) -> Void) {
+        self.addRoute(path) { request, responseHandler in
+            do {
+                try handler(request, responseHandler)
+            } catch {
+                self.errorResponse(statusCode: 500, message: "Internal server error.", responseHandler: responseHandler)
+            }
+        }
     }
 }

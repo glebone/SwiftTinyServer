@@ -1,7 +1,6 @@
 import Foundation
 
-// NoteModel.swift
-
+// Note.swift - Defines the Note structure
 struct Note: Codable {
     var id: String     // Unique ID for each note
     var title: String
@@ -10,8 +9,6 @@ struct Note: Codable {
 }
 
 // NoteModel to manage a list of notes
-import Foundation
-
 class NoteModel: Model {
     private let fileName = "notes.json"
     private var notes: [Note] = [] // In-memory array of notes
@@ -31,24 +28,25 @@ class NoteModel: Model {
     }
     
     func deleteNoteByID(_ id: String) -> Bool {
-            if let index = notes.firstIndex(where: { $0.id == id }) {
-                notes.remove(at: index)
-                saveNotesToFile()
-                return true // Note was successfully deleted
-            }
-            return false // Note with the given ID was not found
+        if let index = notes.firstIndex(where: { $0.id == id }) {
+            notes.remove(at: index)
+            saveNotesToFile()
+            return true // Note was successfully deleted
         }
+        return false // Note with the given ID was not found
+    }
     
     // Get all notes
     func getAllNotes() -> [Note] {
         return notes
     }
     
-    // Get a note by UDID
+    // Get a note by ID
     func getNoteByID(_ id: String) -> Note? {
         return notes.first { $0.id == id }
     }
     
+    // Generate HTML from the list of notes
     func generateNotesHTML(from notes: [Note]) -> String {
         var htmlContent = ""
         
@@ -61,7 +59,7 @@ class NoteModel: Model {
                     <p class="card-text"><small class="text-muted">\(note.date)</small></p>
                     <form action="/note/\(note.id)" method="DELETE">
                         <input type="hidden" name="_method" value="DELETE">
-                        <input type="hidden" name="udid" value="\(note.id)">
+                        <input type="hidden" name="id" value="\(note.id)">
                         <button type="submit" class="btn btn-danger">Delete</button>
                     </form>
                 </div>
@@ -74,14 +72,10 @@ class NoteModel: Model {
     
     // Load notes from JSON file
     private func loadNotesFromFile() -> [Note] {
-        // Read the raw JSON data from the file
         let jsonArray = readJSONFile(named: fileName)
-        
-        // You need to first convert this JSON array back to Data
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         
-        // Create Data directly from the JSON array string
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: jsonArray, options: [])
             let notesArray = try decoder.decode([Note].self, from: jsonData)
@@ -100,13 +94,9 @@ class NoteModel: Model {
         encoder.dateEncodingStrategy = .iso8601
         
         do {
-            // Encode the array of notes directly to JSON Data
             let data = try encoder.encode(notes)
-            
-            // Write the raw Data directly to the JSON file
             let fileURL = getWorkingDirectory().appendingPathComponent(fileName)
             try data.write(to: fileURL)
-            
             print("Successfully saved notes to file.")
         } catch {
             print("Failed to save notes: \(error)")
