@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import NIO
 import NIOHTTP1
 import Foundation
@@ -93,3 +94,17 @@ func linuxLaunch() {
 
 linuxLaunch()
 #endif
+=======
+import Foundation
+import Dispatch
+
+// Instantiate the web framework (Linux-specific server)
+let webFramework: TinyWebFrameworkProtocol = TinyWebServer()
+
+// Start the web app with defined routes
+setupRoutes(webFramework: webFramework)
+// Keep the server running indefinitely
+ webFramework.startServer(host: "127.0.0.1", port: 8080)
+
+dispatchMain()
+>>>>>>> Stashed changes
